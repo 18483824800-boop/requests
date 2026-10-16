@@ -2114,6 +2114,31 @@ class TestRequests:
         )
         assert r.json()["data"] == "data"
 
+    def test_rewind_body_with_getattr_proxy(self):
+        """测试代理类流的rewind
+        代理类通过__getattr__转发属性,不直接定义__iter__。
+        isinstance(data,Iterable)会返回False
+        但hasattr(data, "__iter__")会返回True。
+        """
+
+        class AttrProxy:
+            def __init__(self):
+                self._file = io.BytesIO(b"the data")
+
+            def __getattr__(self, name):
+                return getattr(self._file, name)
+
+        data = AttrProxy()
+        prep = requests.Request("GET", "http://example.com", data=data).prepare()
+
+        # 关键: 代理类被识别为流
+        assert prep._body_position == 0
+        assert prep.body.read() == b"the data"
+
+        # rewind生效
+        requests.utils.rewind_body(prep)
+        assert prep.body.read() == b"the data"
+
     def _patch_adapter_gzipped_redirect(self, session, url):
         adapter = session.get_adapter(url=url)
         org_build_response = adapter.build_response
