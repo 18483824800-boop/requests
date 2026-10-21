@@ -381,6 +381,25 @@ class TestRequests:
         )
         assert r.status_code == 200
 
+
+    def test_custom_cookie_policy_preserved(self):
+        """测试自定义CookiePolicy在prepare_request后是否保留"""
+        import http.cookiejar
+
+        class MyPolicy(http.cookiejar.DefaultCookiePolicy):
+            def return_ok_secure(self, cookie, request):
+                return True
+
+        s=requests.Session()
+        s.cookies = requests.cookies.RequestsCookieJar(policy=MyPolicy())
+        s.cookies.set("test", "value", domain="example.com")
+
+        r=requests.Request("GET","https://example.com")
+        pr=s.prepare_request(r)
+
+        assert isinstance(pr._cookies.get_policy(), MyPolicy)
+            
+
     def test_set_cookie_on_301(self, httpbin):
         s = requests.session()
         url = httpbin("cookies/set?foo=bar")
